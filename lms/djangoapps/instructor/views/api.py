@@ -125,19 +125,17 @@ def common_exceptions_400(func):
     (decorator without arguments)
     """
     def wrapped(request, *args, **kwargs):  # pylint: disable=missing-docstring
-        use_json = (request.is_ajax() or
-                    request.META.get("HTTP_ACCEPT", "").startswith("application/json"))
         try:
             return func(request, *args, **kwargs)
         except User.DoesNotExist:
             message = _("User does not exist.")
-            if use_json:
+            if _use_json(request):
                 return JsonResponse({"error": message}, 400)
             else:
                 return HttpResponseBadRequest(message)
         except AlreadyRunningError:
             message = _("Task is already running.")
-            if use_json:
+            if _use_json(request):
                 return JsonResponse({"error": message}, 400)
             else:
                 return HttpResponseBadRequest(message)
@@ -2152,6 +2150,51 @@ def rescore_problem(request, course_id):
 @ensure_csrf_cookie
 @cache_control(no_cache=True, no_store=True, must_revalidate=True)
 @require_level('instructor')
+@require_post_params(problem_to_reset="problem urlname to reset", score='overriding score')
+@common_exceptions_400
+def override_problem_score(request, course_id):
+    course_id = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+    score = strip_if_string(request.POST.get('score'))
+    problem_to_reset = strip_if_string(request.POST.get('problem_to_reset'))
+    student_identifier = request.POST.get('unique_student_identifier', None)
+
+    if not (problem_to_reset and student_identifier):
+        return HttpResponseBadRequest("Missing query parameters.")
+
+    if student_identifier is not None:
+        student = get_student_from_identifier(student_identifier)
+    else:
+        return _create_error_response(request, "Invalid student ID.")
+
+    try:
+        module_state_key = course_id.make_usage_key_from_deprecated_string(problem_to_reset)
+    except InvalidKeyError:
+        return _create_error_response(request, "Unable to parse problem id.")
+
+    response_payload = {'problem_to_reset': problem_to_reset}
+    response_payload['student'] = student_identifier
+    try:
+        lms.djangoapps.instructor_task.api.submit_override_problem_score_for_student(
+            request,
+            module_state_key,
+            student,
+            score,
+        )
+    except NotImplementedError as exc:
+        return _create_error_response(request, exc.message)
+
+    except ValueError as exc:
+        return _create_error_response(request, exc.message)
+
+    response_payload['task'] = 'created'
+    return JsonResponse(response_payload)
+
+
+@transaction.non_atomic_requests
+@require_POST
+@ensure_csrf_cookie
+@cache_control(no_cache=True, no_store=True, must_revalidate=True)
+@require_level('instructor')
 @common_exceptions_400
 def rescore_entrance_exam(request, course_id):
     """
@@ -3380,3 +3423,25 @@ def _get_boolean_param(request, param_name):
     values to boolean values.
     """
     return request.POST.get(param_name, False) in ['true', 'True', True]
+
+
+def _use_json(request):
+    """
+    Returns whether the current request expects a response in JSON form.
+    """
+    return request.is_ajax() or request.META.get("HTTP_ACCEPT", "").startswith("application/json")
+
+
+def _create_error_response(request, msg):
+    """
+    Creates the appropriate error response for the current request,
+    either raw text or JSON.
+    For use when raising errors with a message intended
+    to be surfaced to the end user.
+    """
+    if _use_json(request):
+        response = JsonResponse({"error": _(msg)}, 400)
+    else:
+        response = HttpResponseBadRequest(_(msg))
+
+    return response
