@@ -340,34 +340,34 @@ class CommentsServiceMockMixin(object):
         Returns expected thread data in API response
         """
         response_data = {
-            "author": self.user.username,
-            "author_label": None,
-            "created_at": "1970-01-01T00:00:00Z",
-            "updated_at": "1970-01-01T00:00:00Z",
-            "raw_body": "Test body",
-            "rendered_body": "<p>Test body</p>",
-            "abuse_flagged": False,
-            "voted": False,
-            "vote_count": 0,
-            "editable_fields": ["abuse_flagged", "following", "raw_body", "read", "title", "topic_id", "type", "voted"],
-            "course_id": unicode(self.course.id),
-            "topic_id": "test_topic",
-            "group_id": None,
-            "group_name": None,
-            "title": "Test Title",
-            "pinned": False,
-            "closed": False,
-            "following": False,
-            "comment_count": 1,
-            "unread_comment_count": 0,
-            "comment_list_url": "http://testserver/api/discussion/v1/comments/?thread_id=test_thread",
-            "endorsed_comment_list_url": None,
-            "non_endorsed_comment_list_url": None,
-            "read": False,
-            "has_endorsed": False,
-            "id": "test_thread",
-            "type": "discussion",
-            "response_count": 0,
+            u"author": self.user.username,
+            u"author_label": None,
+            u"created_at": u"1970-01-01T00:00:00Z",
+            u"updated_at": u"1970-01-01T00:00:00Z",
+            u"raw_body": u"Test body",
+            u"rendered_body": u"<p>Test body</p>",
+            u"abuse_flagged": False,
+            u"voted": False,
+            u"vote_count": 0,
+            u"editable_fields": ["abuse_flagged", "following", "raw_body", "read", "title", "topic_id", "type", "voted"],
+            u"course_id": unicode(self.course.id),
+            u"topic_id": u"test_topic",
+            u"group_id": None,
+            u"group_name": None,
+            u"title": u"Test Title",
+            u"pinned": False,
+            u"closed": False,
+            u"following": False,
+            u"comment_count": 1,
+            u"unread_comment_count": 0,
+            u"comment_list_url": u"http://testserver/api/discussion/v1/comments/?thread_id=test_thread",
+            u"endorsed_comment_list_url": None,
+            u"non_endorsed_comment_list_url": None,
+            u"read": False,
+            u"has_endorsed": False,
+            u"id": u"test_thread",
+            u"type": u"discussion",
+            u"response_count": 0,
         }
         response_data.update(overrides or {})
         return response_data
@@ -442,13 +442,13 @@ def make_paginated_api_response(results=None, count=0, num_pages=0, next_link=No
     Generates the response dictionary of paginated APIs with passed data
     """
     return {
-        "pagination": {
-            "next": next_link,
-            "previous": previous_link,
-            "count": count,
-            "num_pages": num_pages,
+        u"pagination": {
+            u"next": next_link,
+            u"previous": previous_link,
+            u"count": count,
+            u"num_pages": num_pages,
         },
-        "results": results or []
+        u"results": results or []
     }
 
 

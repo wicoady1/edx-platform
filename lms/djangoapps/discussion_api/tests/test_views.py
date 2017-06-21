@@ -361,14 +361,14 @@ class ThreadViewSetListTest(DiscussionAPIViewTestMixin, ModuleStoreTestCase, Pro
             self.create_source_thread({"user_id": str(self.author.id), "username": self.author.username})
         ]
         expected_threads = [self.expected_thread_data({
-            "created_at": "2015-04-28T00:00:00Z",
-            "updated_at": "2015-04-28T11:11:11Z",
-            "vote_count": 4,
-            "comment_count": 6,
-            "unread_comment_count": 3,
-            "voted": True,
-            "author": self.author.username,
-            "editable_fields": ["abuse_flagged", "following", "read", "voted"],
+            u"created_at": u"2015-04-28T00:00:00Z",
+            u"updated_at": u"2015-04-28T11:11:11Z",
+            u"vote_count": 4,
+            u"comment_count": 6,
+            u"unread_comment_count": 3,
+            u"voted": True,
+            u"author": self.author.username,
+            u"editable_fields": [u"abuse_flagged", u"following", u"read", u"voted"],
         })]
         self.register_get_threads_response(source_threads, page=1, num_pages=2)
         response = self.client.get(self.url, {"course_id": unicode(self.course.id), "following": ""})
@@ -376,10 +376,10 @@ class ThreadViewSetListTest(DiscussionAPIViewTestMixin, ModuleStoreTestCase, Pro
             results=expected_threads,
             count=1,
             num_pages=2,
-            next_link="http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&page=2",
+            next_link=u"http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&following=&page=2",
             previous_link=None
         )
-        expected_response.update({"text_search_rewrite": None})
+        expected_response.update({u"text_search_rewrite": None})
         self.assert_response_correct(
             response,
             200,
