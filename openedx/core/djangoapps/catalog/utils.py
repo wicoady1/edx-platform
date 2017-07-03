@@ -2,17 +2,12 @@
 import copy
 import logging
 
-import waffle
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from edx_rest_api_client.client import EdxRestApiClient
 
-from openedx.core.djangoapps.catalog.cache import (
-    PROGRAM_CACHE_KEY_TPL,
-    PROGRAM_UUIDS_CACHE_KEY,
-    SITE_PROGRAM_UUIDS_CACHE_KEY_TPL
-)
+from openedx.core.djangoapps.catalog.cache import PROGRAM_CACHE_KEY_TPL, SITE_PROGRAM_UUIDS_CACHE_KEY_TPL
 from openedx.core.djangoapps.catalog.models import CatalogIntegration
 from openedx.core.djangoapps.theming.helpers import get_current_site
 from openedx.core.lib.edx_api_utils import get_edx_api_data
@@ -55,10 +50,9 @@ def get_programs(uuid=None):
             logger.warning(missing_details_msg_tpl.format(uuid=uuid))
 
         return program
-    if waffle.switch_is_active("get-multitenant-programs"):
-        uuids = cache.get(SITE_PROGRAM_UUIDS_CACHE_KEY_TPL.format(domain=get_current_site().domain), [])
-    else:
-        uuids = cache.get(PROGRAM_UUIDS_CACHE_KEY, [])
+        
+    uuids = cache.get(SITE_PROGRAM_UUIDS_CACHE_KEY_TPL.format(domain=get_current_site().domain), [])
+
     if not uuids:
         logger.warning('Failed to get program UUIDs from the cache.')
 
