@@ -51,6 +51,9 @@ class ProgramPageBase(ProgramsConfigMixin, CatalogIntegrationMixin, UniqueCourse
         self.set_catalog_integration(is_enabled=True, service_username=self.username)
         CatalogFixture().install_programs(programs)
 
+        program_types = [program['type'] for program in programs]
+        CatalogFixture().install_program_types(program_types)
+
     def cache_programs(self):
         """
         Populate the LMS' cache of program data.

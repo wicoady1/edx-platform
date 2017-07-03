@@ -207,7 +207,7 @@ def index(request, extra_context=None, user=AnonymousUser()):
     # Insert additional context for use in the template
     context.update(extra_context)
 
-    context["programs_list"] = get_programs_with_type(include_hidden=False)
+    context['programs_list'] = get_programs_with_type(include_hidden=False)
 
     return render_to_response('index.html', context)
 

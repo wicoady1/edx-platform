@@ -22,16 +22,13 @@ class CatalogFixture(object):
                 will be stubbed using data from this list.
         """
         key = 'catalog.programs'
-        program_types_key = 'catalog.programs_types'
 
         uuids = []
-        program_types = []
         for program in programs:
             uuid = program['uuid']
             uuids.append(uuid)
 
             program_key = '{base}.{uuid}'.format(base=key, uuid=uuid)
-            program_types.append(program['type'])
             requests.put(
                 '{}/set_config'.format(CATALOG_STUB_URL),
                 data={program_key: json.dumps(program)},
@@ -43,12 +40,17 @@ class CatalogFixture(object):
             data={key: json.dumps(uuids)},
         )
 
-        # Stub the program_type endpoint.
+    def install_program_types(self, program_types):
+        """
+        Stub the discovery service's program type list API endpoints.
+
+        Arguments:
+            program_types (list): A list of program types. List endpoint will be stubbed using data from this list.
+        """
         requests.put(
             '{}/set_config'.format(CATALOG_STUB_URL),
-            data={program_types_key: json.dumps(program_types)},
+            data={'catalog.programs_types': json.dumps(program_types)},
         )
-
 
 class CatalogIntegrationMixin(object):
     """Mixin providing a method used to configure the catalog integration."""

@@ -27,11 +27,10 @@ def create_catalog_api_client(user, site=None):
     expires_in = settings.OAUTH_ID_TOKEN_EXPIRATION
     jwt = JwtBuilder(user).build_token(scopes, expires_in)
 
-    if not site:
-        url = CatalogIntegration.current().get_internal_api_url()
+    if site:
+        url = site.configuration.get_value('COURSE_CATALOG_API_URL')
     else:
-        # management command explicitly defining the site.
-        url = site.configuration.get_value("COURSE_CATALOG_API_URL")
+        url = CatalogIntegration.current().get_internal_api_url()
 
     return EdxRestApiClient(url, jwt=jwt)
 
