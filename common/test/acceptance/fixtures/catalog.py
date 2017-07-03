@@ -52,6 +52,7 @@ class CatalogFixture(object):
             data={'catalog.programs_types': json.dumps(program_types)},
         )
 
+
 class CatalogIntegrationMixin(object):
     """Mixin providing a method used to configure the catalog integration."""
     def set_catalog_integration(self, is_enabled=False, service_username=None):
