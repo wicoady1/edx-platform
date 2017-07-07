@@ -281,10 +281,14 @@ def override_score_module_state(xmodule_instance_args, module_descriptor, studen
         set_event_transaction_type(GRADES_OVERRIDE_EVENT_TYPE)
 
         problem_weight = instance.weight if instance.weight is not None else 1
-        instance.set_score(Score(
-            raw_earned=weighted_override_score / problem_weight,
-            raw_possible=instance.max_score() / problem_weight
-        ))
+        if problem_weight == 0:
+            instance.set_score(Score(raw_earned=0, raw_possible=0))
+        else:
+            instance.set_score(Score(
+                raw_earned=weighted_override_score / problem_weight,
+                raw_possible=instance.max_score() / problem_weight
+            ))
+            
         instance.publish_grade()
         instance.save()
         TASK_LOG.debug(
