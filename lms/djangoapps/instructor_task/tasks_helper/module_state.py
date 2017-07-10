@@ -288,7 +288,7 @@ def override_score_module_state(xmodule_instance_args, module_descriptor, studen
                 raw_earned=weighted_override_score / problem_weight,
                 raw_possible=instance.max_score() / problem_weight
             ))
-            
+
         instance.publish_grade()
         instance.save()
         TASK_LOG.debug(
