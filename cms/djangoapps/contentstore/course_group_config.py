@@ -111,9 +111,18 @@ class GroupConfiguration(object):
         """
         Get usage info for unit/module.
         """
+        if unit.category == 'sequential' or item.category == 'split_test':
+            unit_for_url = item
+        elif unit.get_parent() and unit.get_parent().category == 'split_test':
+            unit_for_url = unit.get_parent()
+            item = unit
+            unit = unit.get_parent()
+        else:
+            unit_for_url = unit
+
         unit_url = reverse_usage_url(
             'container_handler',
-            course.location.course_key.make_usage_key(unit.location.block_type, unit.location.name)
+            course.location.course_key.make_usage_key(unit_for_url.location.block_type, unit_for_url.location.name)
         )
 
         usage_dict = {'label': u"{} / {}".format(unit.display_name, item.display_name), 'url': unit_url}
