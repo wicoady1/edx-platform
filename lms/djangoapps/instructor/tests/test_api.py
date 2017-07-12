@@ -2680,14 +2680,19 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
             'get_problem_responses',
             kwargs={'course_id': unicode(self.course.id)}
         )
-
+        report_type = 'problem responses'
         with patch('lms.djangoapps.instructor_task.api.submit_calculate_problem_responses_csv') as submit_task_function:
             error = AlreadyRunningError()
             submit_task_function.side_effect = error
             response = self.client.post(url, {})
             res_json = json.loads(response.content)
             self.assertIn('status', res_json)
-            self.assertIn('already in progress', res_json['status'])
+            already_running_status = "The {report_type} report is being created." \
+                                     " To view the status of the report, see Pending Tasks below." \
+                                     " You will be able to download the report" \
+                                     " when it is" \
+                                     " complete.".format(report_type=report_type)
+            self.assertIn(already_running_status, res_json['status'])
 
     def test_get_students_features(self):
         """
@@ -2755,11 +2760,17 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
             'get_students_who_may_enroll',
             kwargs={'course_id': unicode(self.course.id)}
         )
+        report_type = 'enrollment'
+        already_running_status = "The {report_type} report is being created." \
+                                 " To view the status of the report, see Pending Tasks below." \
+                                 " You will be able to download the report" \
+                                 " when it is" \
+                                 " complete.".format(report_type=report_type)
         # Successful case:
         response = self.client.post(url, {})
         res_json = json.loads(response.content)
         self.assertIn('status', res_json)
-        self.assertNotIn('currently being created', res_json['status'])
+        self.assertNotIn(already_running_status, res_json['status'])
         # CSV generation already in progress:
         with patch('lms.djangoapps.instructor_task.api.submit_calculate_may_enroll_csv') as submit_task_function:
             error = AlreadyRunningError()
@@ -2767,7 +2778,7 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
             response = self.client.post(url, {})
             res_json = json.loads(response.content)
             self.assertIn('status', res_json)
-            self.assertIn('currently being created', res_json['status'])
+            self.assertIn(already_running_status, res_json['status'])
 
     def test_get_student_exam_results(self):
         """
@@ -2778,11 +2789,18 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
             'get_proctored_exam_results',
             kwargs={'course_id': unicode(self.course.id)}
         )
+
+        report_type = 'proctored exam results'
+        already_running_status = "The {report_type} report is being created." \
+                                 " To view the status of the report, see Pending Tasks below." \
+                                 " You will be able to download the report" \
+                                 " when it is" \
+                                 " complete.".format(report_type=report_type)
         # Successful case:
         response = self.client.post(url, {})
         res_json = json.loads(response.content)
         self.assertIn('status', res_json)
-        self.assertNotIn('currently being created', res_json['status'])
+        self.assertNotIn(already_running_status, res_json['status'])
         # CSV generation already in progress:
         with patch('lms.djangoapps.instructor_task.api.submit_proctored_exam_results_report') as submit_task_function:
             error = AlreadyRunningError()
@@ -2790,7 +2808,7 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
             response = self.client.post(url, {})
             res_json = json.loads(response.content)
             self.assertIn('status', res_json)
-            self.assertIn('currently being created', res_json['status'])
+            self.assertIn(already_running_status, res_json['status'])
 
     def test_access_course_finance_admin_with_invalid_course_key(self):
         """
@@ -3078,7 +3096,7 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
         with patch(task_api_endpoint) as mock:
             mock.side_effect = AlreadyRunningError()
             response = self.client.post(url, {})
-        already_running_status = "The {report_type} report is currently being created." \
+        already_running_status = "The {report_type} report is being created." \
                                  " To view the status of the report, see Pending Tasks below." \
                                  " You will be able to download the report" \
                                  " when it is" \
@@ -3091,16 +3109,20 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
         with patch('lms.djangoapps.instructor_task.api.submit_export_ora2_data') as mock_submit_ora2_task:
             mock_submit_ora2_task.return_value = True
             response = self.client.post(url, {})
-        success_status = "The ORA data report is being generated."
+        success_status = "The ORA data report is being created."
         self.assertIn(success_status, response.content)
 
     def test_get_ora2_responses_already_running(self):
         url = reverse('export_ora2_data', kwargs={'course_id': unicode(self.course.id)})
-
+        report_type = 'ORA data'
         with patch('lms.djangoapps.instructor_task.api.submit_export_ora2_data') as mock_submit_ora2_task:
             mock_submit_ora2_task.side_effect = AlreadyRunningError()
             response = self.client.post(url, {})
-        already_running_status = "An ORA data report generation task is already in progress."
+        already_running_status = "The {report_type} report report is being created." \
+                                 " To view the status of the report, see Pending Tasks below." \
+                                 " You will be able to download the report" \
+                                 " when it is" \
+                                 " complete.".format(report_type=report_type)
         self.assertIn(already_running_status, response.content)
 
     def test_get_student_progress_url(self):

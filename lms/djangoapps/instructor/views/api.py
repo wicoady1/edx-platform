@@ -70,7 +70,7 @@ from lms.djangoapps.instructor.enrollment import (
 )
 from lms.djangoapps.instructor.views import INVOICE_KEY
 from lms.djangoapps.instructor.views.instructor_task_helpers import extract_email_features, extract_task_features
-from lms.djangoapps.instructor_task.api_helper import AlreadyRunningError
+from lms.djangoapps.instructor_task.api_helper import AlreadyRunningError, QueueConnectionError
 from lms.djangoapps.instructor_task.models import ReportStore
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.course_groups.cohorts import is_course_cohorted
@@ -130,6 +130,13 @@ from .tools import (
 log = logging.getLogger(__name__)
 
 
+SUCCESS_MESSAGE_TEMPLATE  = "The {} report is being created. " \
+                            "To view the status of the report, see Pending Tasks below."
+
+ALREADY_RUNNING_MESSAGE_TEMPLATE = "The {} report is being created. " \
+                                   "To view the status of the report, see Pending Tasks below. " \
+                                   "You will be able to download the report when it is complete."
+
 def common_exceptions_400(func):
     """
     Catches common exceptions and renders matching 400 errors.
@@ -148,6 +155,12 @@ def common_exceptions_400(func):
                 return HttpResponseBadRequest(message)
         except AlreadyRunningError:
             message = _("Task is already running.")
+            if use_json:
+                return JsonResponse({"error": message}, 400)
+            else:
+                return HttpResponseBadRequest(message)
+        except QueueConnectionError:
+            message = _("Unable to connect to messaging queue")
             if use_json:
                 return JsonResponse({"error": message}, 400)
             else:
@@ -974,6 +987,8 @@ def get_problem_responses(request, course_id):
     """
     course_key = CourseKey.from_string(course_id)
     problem_location = request.POST.get('problem_location', '')
+    report_type = 'problem responses'
+    response_payload = {}
 
     try:
         problem_key = UsageKey.from_string(problem_location)
@@ -988,18 +1003,17 @@ def get_problem_responses(request, course_id):
 
     try:
         lms.djangoapps.instructor_task.api.submit_calculate_problem_responses_csv(request, course_key, problem_location)
-        success_status = _(
-            "The problem responses report is being created."
-            " To view the status of the report, see Pending Tasks below."
-        )
-        return JsonResponse({"status": success_status})
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
+
     except AlreadyRunningError:
-        already_running_status = _(
-            "A problem responses report generation task is already in progress. "
-            "Check the 'Pending Tasks' table for the status of the task. "
-            "When completed, the report will be available for download in the table below."
-        )
-        return JsonResponse({"status": already_running_status})
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 
 @require_POST
@@ -1216,7 +1230,7 @@ def get_students_features(request, course_id, csv=False):  # pylint: disable=red
     """
     course_key = CourseKey.from_string(course_id)
     course = get_course_by_id(course_key)
-
+    report_type = 'enrolled learner profile'
     available_features = instructor_analytics.basic.AVAILABLE_FEATURES
 
     # Allow for sites to be able to define additional columns.
@@ -1281,22 +1295,24 @@ def get_students_features(request, course_id, csv=False):  # pylint: disable=red
             'available_features': available_features,
         }
         return JsonResponse(response_payload)
+
     else:
+        response_payload = {}
         try:
             lms.djangoapps.instructor_task.api.submit_calculate_students_features_csv(
                 request,
                 course_key,
                 query_features
             )
-            success_status = _("The enrolled learner profile report is being created."
-                               " To view the status of the report, see Pending Tasks below.")
-            return JsonResponse({"status": success_status})
+            success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+            response_payload['status'] = success_status
         except AlreadyRunningError:
-            already_running_status = _(
-                "This enrollment report is currently being created."
-                " To view the status of the report, see Pending Tasks below."
-                " You will be able to download the report when it is complete.")
-            return JsonResponse({"status": already_running_status})
+            already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+            response_payload['status'] = already_running_status
+        except QueueConnectionError:
+            return JsonResponseBadRequest()
+
+        return JsonResponse(response_payload)
 
 
 @transaction.non_atomic_requests
@@ -1315,21 +1331,21 @@ def get_students_who_may_enroll(request, course_id):
     """
     course_key = CourseKey.from_string(course_id)
     query_features = ['email']
+    report_type = 'enrollment'
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_calculate_may_enroll_csv(request, course_key, query_features)
-        success_status = _(
-            "The enrollment report is being created. This report contains"
-            " information about learners who can enroll in the course."
-            " To view the status of the report, see Pending Tasks below."
-        )
-        return JsonResponse({"status": success_status})
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
+
     except AlreadyRunningError:
-        already_running_status = _(
-            "This enrollment report is currently being created."
-            " To view the status of the report, see Pending Tasks below."
-            " You will be able to download the report when it is complete."
-        )
-        return JsonResponse({"status": already_running_status})
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 
 @transaction.non_atomic_requests
@@ -1375,8 +1391,10 @@ def add_users_to_cohorts(request, course_id):
     except (FileValidationException, PermissionDenied) as err:
         return JsonResponse({"error": unicode(err)}, status=400)
 
-    return JsonResponse()
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
 
+    return JsonResponse()
 
 @ensure_csrf_cookie
 @cache_control(no_cache=True, no_store=True, must_revalidate=True)
@@ -1417,19 +1435,22 @@ def get_enrollment_report(request, course_id):
     """
     get the enrollment report for the particular course.
     """
+    report_type = 'detailed enrollment'
     course_key = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_detailed_enrollment_features_csv(request, course_key)
-        success_status = _("The detailed enrollment report is being created."
-                           " To view the status of the report, see Pending Tasks below.")
-        return JsonResponse({"status": success_status})
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
+
     except AlreadyRunningError:
-        already_running_status = _("The detailed enrollment report is being created."
-                                   " To view the status of the report, see Pending Tasks below."
-                                   " You will be able to download the report when it is complete.")
-        return JsonResponse({
-            "status": already_running_status
-        })
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 
 @transaction.non_atomic_requests
@@ -1442,21 +1463,22 @@ def get_exec_summary_report(request, course_id):
     """
     get the executive summary report for the particular course.
     """
+    report_type = 'executive summary'
     course_key = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_executive_summary_report(request, course_key)
-        status_response = _("The executive summary report is being created."
-                            " To view the status of the report, see Pending Tasks below.")
-    except AlreadyRunningError:
-        status_response = _(
-            "The executive summary report is currently being created."
-            " To view the status of the report, see Pending Tasks below."
-            " You will be able to download the report when it is complete."
-        )
-    return JsonResponse({
-        "status": status_response
-    })
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
 
+    except AlreadyRunningError:
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 @transaction.non_atomic_requests
 @require_POST
@@ -1467,21 +1489,22 @@ def get_course_survey_results(request, course_id):
     """
     get the survey results report for the particular course.
     """
+    report_type = 'survey'
     course_key = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_course_survey_report(request, course_key)
-        status_response = _("The survey report is being created."
-                            " To view the status of the report, see Pending Tasks below.")
-    except AlreadyRunningError:
-        status_response = _(
-            "The survey report is currently being created."
-            " To view the status of the report, see Pending Tasks below."
-            " You will be able to download the report when it is complete."
-        )
-    return JsonResponse({
-        "status": status_response
-    })
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
 
+    except AlreadyRunningError:
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 @transaction.non_atomic_requests
 @require_POST
@@ -1492,6 +1515,7 @@ def get_proctored_exam_results(request, course_id):
     """
     get the proctored exam resultsreport for the particular course.
     """
+    report_type = 'proctored exam results'
     query_features = [
         'user_email',
         'exam_name',
@@ -1504,20 +1528,20 @@ def get_proctored_exam_results(request, course_id):
     ]
 
     course_key = CourseKey.from_string(course_id)
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_proctored_exam_results_report(request, course_key, query_features)
-        status_response = _("The proctored exam results report is being created."
-                            " To view the status of the report, see Pending Tasks below.")
-    except AlreadyRunningError:
-        status_response = _(
-            "The proctored exam results report is currently being created."
-            " To view the status of the report, see Pending Tasks below."
-            " You will be able to download the report when it is complete."
-        )
-    return JsonResponse({
-        "status": status_response
-    })
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
 
+    except AlreadyRunningError:
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 def save_registration_code(user, course_id, mode_slug, invoice=None, order=None, invoice_item=None):
     """
@@ -2004,9 +2028,12 @@ def reset_student_attempts(request, course_id):
             return HttpResponse(error_msg, status=500)
         response_payload['student'] = student_identifier
     elif all_students:
-        lms.djangoapps.instructor_task.api.submit_reset_problem_attempts_for_all_students(request, module_state_key)
-        response_payload['task'] = 'created'
-        response_payload['student'] = 'All Students'
+        try:
+            lms.djangoapps.instructor_task.api.submit_reset_problem_attempts_for_all_students(request, module_state_key)
+            response_payload['task'] = 'created'
+            response_payload['student'] = 'All Students'
+        except QueueConnectionError:
+            return JsonResponseBadRequest()
     else:
         return HttpResponseBadRequest()
 
@@ -2084,6 +2111,9 @@ def reset_student_attempts_for_entrance_exam(request, course_id):  # pylint: dis
     except InvalidKeyError:
         return HttpResponseBadRequest(_("Course has no valid entrance exam section."))
 
+    except QueueConnectionError:
+        return HttpResponseBadRequest(_("Error occured. Please try again."))
+
     response_payload = {'student': student_identifier or _('All Students'), 'task': 'created'}
     return JsonResponse(response_payload)
 
@@ -2143,6 +2173,10 @@ def rescore_problem(request, course_id):
             )
         except NotImplementedError as exc:
             return HttpResponseBadRequest(exc.message)
+
+        except QueueConnectionError:
+            return JsonResponseBadRequest()
+
     elif all_students:
         try:
             lms.djangoapps.instructor_task.api.submit_rescore_problem_for_all_students(
@@ -2152,6 +2186,10 @@ def rescore_problem(request, course_id):
             )
         except NotImplementedError as exc:
             return HttpResponseBadRequest(exc.message)
+
+        except QueueConnectionError:
+            return HttpResponseBadRequest(_("Error occured. Please try again."))
+
     else:
         return HttpResponseBadRequest()
 
@@ -2209,10 +2247,14 @@ def rescore_entrance_exam(request, course_id):
         response_payload['student'] = student_identifier
     else:
         response_payload['student'] = _("All Students")
+    try:
+        lms.djangoapps.instructor_task.api.submit_rescore_entrance_exam_for_student(
+            request, entrance_exam_key, student, only_if_higher,
+        )
 
-    lms.djangoapps.instructor_task.api.submit_rescore_entrance_exam_for_student(
-        request, entrance_exam_key, student, only_if_higher,
-    )
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
     response_payload['task'] = 'created'
     return JsonResponse(response_payload)
 
@@ -2397,20 +2439,21 @@ def export_ora2_data(request, course_id):
     Pushes a Celery task which will aggregate ora2 responses for a course into a .csv
     """
     course_key = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+    report_type = 'ORA data'
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_export_ora2_data(request, course_key)
-        success_status = _("The ORA data report is being generated.")
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
 
-        return JsonResponse({"status": success_status})
     except AlreadyRunningError:
-        already_running_status = _(
-            "An ORA data report generation task is already in "
-            "progress. Check the 'Pending Tasks' table "
-            "for the status of the task. When completed, the report "
-            "will be available for download in the table below."
-        )
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
 
-        return JsonResponse({"status": already_running_status})
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 
 @transaction.non_atomic_requests
@@ -2422,17 +2465,22 @@ def calculate_grades_csv(request, course_id):
     """
     AlreadyRunningError is raised if the course's grades are already being updated.
     """
+    report_type = 'grade'
     course_key = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_calculate_grades_csv(request, course_key)
-        success_status = _("The grade report is being created."
-                           " To view the status of the report, see Pending Tasks below.")
-        return JsonResponse({"status": success_status})
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
+
     except AlreadyRunningError:
-        already_running_status = _("The grade report is currently being created."
-                                   " To view the status of the report, see Pending Tasks below."
-                                   " You will be able to download the report when it is complete.")
-        return JsonResponse({"status": already_running_status})
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 
 @transaction.non_atomic_requests
@@ -2448,19 +2496,22 @@ def problem_grade_report(request, course_id):
     AlreadyRunningError is raised if the course's grades are already being
     updated.
     """
+    report_type = 'problem grade'
     course_key = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+    response_payload = {}
     try:
         lms.djangoapps.instructor_task.api.submit_problem_grade_report(request, course_key)
-        success_status = _("The problem grade report is being created."
-                           " To view the status of the report, see Pending Tasks below.")
-        return JsonResponse({"status": success_status})
+        success_status = _(SUCCESS_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = success_status
+
     except AlreadyRunningError:
-        already_running_status = _("A problem grade report is already being generated."
-                                   " To view the status of the report, see Pending Tasks below."
-                                   " You will be able to download the report when it is complete.")
-        return JsonResponse({
-            "status": already_running_status
-        })
+        already_running_status = _(ALREADY_RUNNING_MESSAGE_TEMPLATE.format(report_type))
+        response_payload['status'] = already_running_status
+
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
+    return JsonResponse(response_payload)
 
 
 @require_POST
@@ -2599,13 +2650,17 @@ def send_email(request, course_id):
                       course_id, request.user, targets)
         return HttpResponseBadRequest(repr(err))
 
-    # Submit the task, so that the correct InstructorTask object gets created (for monitoring purposes)
-    lms.djangoapps.instructor_task.api.submit_bulk_course_email(request, course_id, email.id)
+    try:
+        # Submit the task, so that the correct InstructorTask object gets created (for monitoring purposes)
+        lms.djangoapps.instructor_task.api.submit_bulk_course_email(request, course_id, email.id)
 
-    response_payload = {
-        'course_id': course_id.to_deprecated_string(),
-        'success': True,
-    }
+        response_payload = {
+            'course_id': course_id.to_deprecated_string(),
+            'success': True,
+        }
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
     return JsonResponse(response_payload)
 
 
@@ -2888,13 +2943,17 @@ def start_certificate_generation(request, course_id):
     Start generating certificates for all students enrolled in given course.
     """
     course_key = CourseKey.from_string(course_id)
-    task = lms.djangoapps.instructor_task.api.generate_certificates_for_students(request, course_key)
-    message = _('Certificate generation task for all students of this course has been started. '
-                'You can view the status of the generation task in the "Pending Tasks" section.')
-    response_payload = {
-        'message': message,
-        'task_id': task.task_id
-    }
+    try:
+        task = lms.djangoapps.instructor_task.api.generate_certificates_for_students(request, course_key)
+        message = _('Certificate generation task for all students of this course has been started. '
+                    'You can view the status of the generation task in the "Pending Tasks" section.')
+        response_payload = {
+            'message': message,
+            'task_id': task.task_id
+        }
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
     return JsonResponse(response_payload)
 
 
@@ -2931,14 +2990,17 @@ def start_certificate_regeneration(request, course_id):
         )
     try:
         lms.djangoapps.instructor_task.api.regenerate_certificates(request, course_key, certificates_statuses)
+        response_payload = {
+            'message': _('Certificate regeneration task has been started. '
+                         'You can view the status of the generation task in the "Pending Tasks" section.'),
+            'success': True
+        }
     except AlreadyRunningError as error:
         return JsonResponse({'message': error.message}, status=400)
 
-    response_payload = {
-        'message': _('Certificate regeneration task has been started. '
-                     'You can view the status of the generation task in the "Pending Tasks" section.'),
-        'success': True
-    }
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
+
     return JsonResponse(response_payload)
 
 
@@ -3150,13 +3212,14 @@ def generate_certificate_exceptions(request, course_id, generate_for=None):
             },
             status=400
         )
-
-    lms.djangoapps.instructor_task.api.generate_certificates_for_students(request, course_key, student_set=students)
-
-    response_payload = {
-        'success': True,
-        'message': _('Certificate generation started for white listed students.'),
-    }
+    try:
+        lms.djangoapps.instructor_task.api.generate_certificates_for_students(request, course_key, student_set=students)
+        response_payload = {
+            'success': True,
+            'message': _('Certificate generation started for white listed students.'),
+        }
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
 
     return JsonResponse(response_payload)
 
@@ -3360,9 +3423,12 @@ def re_validate_certificate(request, course_key, generated_certificate):
 
     # We need to generate certificate only for a single student here
     student = certificate_invalidation.generated_certificate.user
-    lms.djangoapps.instructor_task.api.generate_certificates_for_students(
-        request, course_key, student_set="specific_student", specific_student_id=student.id
-    )
+    try:
+        lms.djangoapps.instructor_task.api.generate_certificates_for_students(
+            request, course_key, student_set="specific_student", specific_student_id=student.id
+        )
+    except QueueConnectionError:
+        return JsonResponseBadRequest()
 
 
 def validate_request_data_and_get_certificate(certificate_invalidation, course_key):

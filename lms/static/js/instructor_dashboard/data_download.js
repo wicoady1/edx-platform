@@ -314,15 +314,15 @@
                     url: url,
                     error: statusAjaxError(function() {
                         if (e.target.name === 'calculate-grades-csv') {
-                            dataDownloadObj.$grades_request_response_error.text(
+                            dataDownloadObj.$reports_request_response_error.text(
                                 gettext('Error generating grades. Please try again.')
                             );
                         } else if (e.target.name === 'problem-grade-report') {
-                            dataDownloadObj.$grades_request_response_error.text(
+                            dataDownloadObj.$reports_request_response_error.text(
                                 gettext('Error generating problem grade report. Please try again.')
                             );
                         } else if (e.target.name === 'export-ora2-data') {
-                            dataDownloadObj.$grades_request_response_error.text(
+                            dataDownloadObj.$reports_request_response_error.text(
                                 gettext('Error generating ORA data report. Please try again.')
                             );
                         }

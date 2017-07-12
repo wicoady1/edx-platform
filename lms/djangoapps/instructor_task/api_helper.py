@@ -27,6 +27,13 @@ class AlreadyRunningError(Exception):
     pass
 
 
+class QueueConnectionError(Exception):
+    """
+    Exception
+    """
+    pass
+
+
 def _task_is_running(course_id, task_type, task_key):
     """Checks if a particular task is already running"""
     running_tasks = InstructorTask.objects.filter(
@@ -188,6 +195,22 @@ def _update_instructor_task(instructor_task, task_result):
         if entry_needs_saving:
             instructor_task.save()
 
+def _update_instructor_task_state(instructor_task, task_state, message=None):
+    """
+     Update state and output of InstructorTask object.
+    """
+    instructor_task.task_state = task_state
+    if message:
+        instructor_task.task_output = message
+
+    instructor_task.save()
+
+def _handle_instructor_task_failure(instructor_task, error):
+
+    _update_instructor_task_state(instructor_task, FAILURE, error.message)
+    log.info("instructor task (%s) failed, result: %s", instructor_task.task_id, error.message)
+
+    raise QueueConnectionError()
 
 def get_updated_instructor_task(task_id):
     """
@@ -345,6 +368,10 @@ def submit_task(request, task_type, task_class, course_key, task_input, task_key
 
     task_id = instructor_task.task_id
     task_args = [instructor_task.id, _get_xmodule_instance_args(request, task_id)]
-    task_class.apply_async(task_args, task_id=task_id)
+    try:
+        task_class.apply_async(task_args, task_id=task_id)
+
+    except IOError as error:
+        _handle_instructor_task_failure(instructor_task, error)
 
     return instructor_task
