@@ -6,16 +6,10 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 
-import pytz
-from django.conf import settings
-from django.core.urlresolvers import reverse
-from django.http import Http404
-from fs.errors import ResourceNotFoundError
-from opaque_keys.edx.keys import UsageKey
-from path import Path as path
-
 import branding
+import pytz
 from courseware.access import has_access
+from courseware.access_response import StartDateError
 from courseware.date_summary import (
     CourseEndDate,
     CourseStartDate,
@@ -25,13 +19,20 @@ from courseware.date_summary import (
 )
 from courseware.model_data import FieldDataCache
 from courseware.module_render import get_module, get_module_for_descriptor
+from django.conf import settings
+from django.core.urlresolvers import reverse
+from django.http import Http404, QueryDict
 from edxmako.shortcuts import render_to_string
+from fs.errors import ResourceNotFoundError
 from lms.djangoapps.courseware.courseware_access_exception import CoursewareAccessException
 from lms.djangoapps.courseware.exceptions import CourseAccessRedirect
+from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+from path import Path as path
 from static_replace import replace_static_urls
 from student.models import CourseEnrollment
+from util.date_utils import strftime_localized
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError
 from xmodule.x_module import STUDENT_VIEW
@@ -108,6 +109,27 @@ def get_course_overview_with_access(user, action, course_key, check_if_enrolled=
     return course_overview
 
 
+def _check_start_date_access_error(course, access_response):
+    """
+    Checks the response from has_access for a StartDateError.
+
+    Has a side effect of redirecting to the dashboard in the case of a
+    StartDateError.
+
+    Arguments:
+        course (CourseDescriptor|CourseOverview): The course being checked.
+        access_response (): The response from a previous call to has_access.
+    """
+    if isinstance(access_response, StartDateError):
+        start_date = strftime_localized(course.start, 'SHORT_DATE')
+        params = QueryDict(mutable=True)
+        params['notlive'] = start_date
+        raise CourseAccessRedirect('{dashboard_url}?{params}'.format(
+            dashboard_url=reverse('dashboard'),
+            params=params.urlencode()
+        ))
+
+
 def check_course_access(course, user, action, check_if_enrolled=False):
     """
     Check that the user has the access to perform the specified action
@@ -121,6 +143,8 @@ def check_course_access(course, user, action, check_if_enrolled=False):
 
     access_response = has_access(user, action, course, course.id)
     if not access_response:
+        _check_start_date_access_error(course, access_response)
+
         # Deliberately return a non-specific error message to avoid
         # leaking info about access control settings
         raise CoursewareAccessException(access_response)
