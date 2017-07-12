@@ -13,6 +13,7 @@ from pyquery import PyQuery as pq
 
 from lms.djangoapps.ccx.tests.factories import CcxFactory
 from openedx.core.djangoapps.self_paced.models import SelfPacedConfiguration
+from openedx.core.djangoapps.waffle_utils.testutils import WAFFLE_TABLES
 from student.models import CourseEnrollment
 from student.tests.factories import AdminFactory
 from util.date_utils import strftime_localized
@@ -27,6 +28,8 @@ from xmodule.modulestore.tests.utils import TEST_DATA_DIR
 from xmodule.modulestore.xml_importer import import_course_from_xml
 
 from .helpers import LoginEnrollmentTestCase
+
+QUERY_COUNT_TABLE_BLACKLIST = WAFFLE_TABLES
 
 
 @attr(shard=1)
@@ -378,14 +381,14 @@ class SelfPacedCourseInfoTestCase(LoginEnrollmentTestCase, SharedModuleStoreTest
         and Mongo queries.
         """
         url = reverse('info', args=[unicode(course.id)])
-        with self.assertNumQueries(sql_queries):
+        with self.assertNumQueries(sql_queries, table_blacklist=QUERY_COUNT_TABLE_BLACKLIST):
             with check_mongo_calls(mongo_queries):
                 with mock.patch("openedx.core.djangoapps.theming.helpers.get_current_site", return_value=None):
                     resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
 
     def test_num_queries_instructor_paced(self):
-        self.fetch_course_info_with_queries(self.instructor_paced_course, 26, 4)
+        self.fetch_course_info_with_queries(self.instructor_paced_course, 22, 4)
 
     def test_num_queries_self_paced(self):
-        self.fetch_course_info_with_queries(self.self_paced_course, 26, 4)
+        self.fetch_course_info_with_queries(self.self_paced_course, 22, 4)
