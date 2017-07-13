@@ -44,9 +44,14 @@ class HelperMethods(object):
 
         Assign Group Configuration to the experiment if cid is provided.
         """
+        sequential = ItemFactory.create(
+            category='sequential',
+            parent_location=self.course.location,
+            display_name='Test Subsection {}'.format(name_suffix)
+        )
         vertical = ItemFactory.create(
             category='vertical',
-            parent_location=self.course.location,
+            parent_location=sequential.location,
             display_name='Test Unit {}'.format(name_suffix)
         )
         c0_url = self.course.id.make_usage_key("vertical", "split_test_cond0")
@@ -93,9 +98,18 @@ class HelperMethods(object):
         Create a problem
         Assign content group to the problem.
         """
+        vertical_parent_location = self.course.location
+        if not orphan:
+            subsection = ItemFactory.create(
+                category='sequential',
+                parent_location=self.course.location,
+                display_name="Test Subsection {}".format(name_suffix)
+            )
+            vertical_parent_location = subsection.location
+
         vertical = ItemFactory.create(
             category='vertical',
-            parent_location=self.course.location,
+            parent_location=vertical_parent_location,
             display_name="Test Unit {}".format(name_suffix)
         )
 
@@ -113,7 +127,7 @@ class HelperMethods(object):
         )
 
         if not orphan:
-            self.course.children.append(vertical.location)
+            self.course.children.append(subsection.location)
         self.save_course()
 
         return vertical, problem

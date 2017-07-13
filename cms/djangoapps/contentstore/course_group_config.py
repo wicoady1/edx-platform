@@ -118,15 +118,16 @@ class GroupConfiguration(object):
             # Display the topmost unit page if
             # the item is a child of the topmost unit and doesn't have its own children.
             unit_for_url = unit
-        elif not parent_unit or (unit == parent_unit and item.has_children):
+        elif (not parent_unit and unit.get_parent()) or (unit == parent_unit and item.has_children):
             # Display the item's page rather than the unit page if
             # the item is one level below the topmost unit and has children, or
-            # the item itself *is* the topmost unit (and thus does not have a parent unit).
+            # the item itself *is* the topmost unit (and thus does not have a parent unit, but is not an orphan).
             unit_for_url = item
         else:
             # If the item is nested deeper than two levels (the topmost unit > vertical > ... > item)
             # display the page for the nested vertical element.
             parent = item.get_parent()
+            nested_vertical = item
             while parent != parent_unit:
                 nested_vertical = parent
                 parent = parent.get_parent()
