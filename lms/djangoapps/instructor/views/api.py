@@ -131,11 +131,12 @@ log = logging.getLogger(__name__)
 
 
 SUCCESS_MESSAGE_TEMPLATE = "The {} report is being created. " \
-                            "To view the status of the report, see Pending Tasks below."
+                           "To view the status of the report, see Pending Tasks below."
 
 ALREADY_RUNNING_MESSAGE_TEMPLATE = "The {} report is being created. " \
                                    "To view the status of the report, see Pending Tasks below. " \
                                    "You will be able to download the report when it is complete."
+
 
 def common_exceptions_400(func):
     """
