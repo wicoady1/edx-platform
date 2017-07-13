@@ -29,7 +29,7 @@ class AlreadyRunningError(Exception):
 
 class QueueConnectionError(Exception):
     """
-    Exception
+    Exception indicating that celery task was not created successfully.
     """
     pass
 
@@ -208,7 +208,9 @@ def _update_instructor_task_state(instructor_task, task_state, message=None):
 
 
 def _handle_instructor_task_failure(instructor_task, error):
-
+    """
+    Do required operations if task creation was not complete.
+    """
     _update_instructor_task_state(instructor_task, FAILURE, error.message)
     log.info("instructor task (%s) failed, result: %s", instructor_task.task_id, error.message)
 
