@@ -271,7 +271,7 @@ def check_arguments_for_overriding(usage_key, score):
     the problem or less than 0.
     """
     descriptor = modulestore().get_item(usage_key)
-    score = int(score)
+    score = float(score)
 
     # some weirdness around initializing the descriptor requires this
     if not hasattr(descriptor.__class__, 'set_score'):

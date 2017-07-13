@@ -2161,18 +2161,21 @@ def override_problem_score(request, course_id):
     problem_to_reset = strip_if_string(request.POST.get('problem_to_reset'))
     student_identifier = request.POST.get('unique_student_identifier', None)
 
-    if not (problem_to_reset and student_identifier):
-        return HttpResponseBadRequest("Missing query parameters.")
+    if not problem_to_reset:
+        return HttpResponseBadRequest("Missing query parameter problem_to_reset.")
+
+    if not student_identifier:
+        return HttpResponseBadRequest("Missing query parameter student_identifier.")
 
     if student_identifier is not None:
         student = get_student_from_identifier(student_identifier)
     else:
-        return _create_error_response(request, "Invalid student ID.")
+        return _create_error_response(request, "Invalid student ID {}.".format(student_identifier))
 
     try:
         usage_key = UsageKey.from_string(problem_to_reset).map_into_course(course_key)
     except InvalidKeyError:
-        return _create_error_response(request, "Unable to parse problem id.")
+        return _create_error_response(request, "Unable to parse problem id {}.".format(problem_to_reset))
 
     response_payload = {
         'problem_to_reset': problem_to_reset,
@@ -3430,23 +3433,9 @@ def _get_boolean_param(request, param_name):
     return request.POST.get(param_name, False) in ['true', 'True', True]
 
 
-def _use_json(request):
-    """
-    Returns whether the current request expects a response in JSON form.
-    """
-    return request.is_ajax() or request.META.get("HTTP_ACCEPT", "").startswith("application/json")
-
-
 def _create_error_response(request, msg):
     """
     Creates the appropriate error response for the current request,
-    either raw text or JSON.
-    For use when raising errors with a message intended
-    to be surfaced to the end user.
+    in JSON form.
     """
-    if _use_json(request):
-        response = JsonResponse({"error": _(msg)}, 400)
-    else:
-        response = HttpResponseBadRequest(_(msg))
-
-    return response
+    return JsonResponse({"error": _(msg)}, 400)

@@ -270,19 +270,30 @@ class ScoreField(JSONField):
         if isinstance(value, Score):
             return value
 
-        if ('raw_earned' not in value or 'raw_possible' not in value) or any(
-            key not in ['raw_earned', 'raw_possible'] for key in value.keys()
-        ):
-            raise TypeError('Scores must contain only a raw earned and raw possible value.')
+        if set(value) != {'raw_earned', 'raw_possible'}:
+            raise TypeError('Scores must contain only a raw earned and raw possible value. Got {}'.format(
+                set(value)
+            ))
 
         raw_earned = value['raw_earned']
         raw_possible = value['raw_possible']
 
         if raw_possible < 0:
-            raise ValueError('raw_possible must be a positive number.')
+            raise ValueError(
+                'Error deserializing field of type {0}: Expected a positive number for raw_possible, got {1}.'.format(
+                    self.display_name,
+                    raw_possible,
+                )
+            )
 
         if not (0 <= raw_earned <= raw_possible):
-            raise ValueError('raw_earned must be between zero and raw_possible.')
+            raise ValueError(
+                'Error deserializing field of type {0}: Expected raw_earned between 0 and {1}, got {2}.'.format(
+                    self.display_name,
+                    raw_possible,
+                    raw_earned
+                )
+            )
 
         return Score(raw_earned, raw_possible)
 

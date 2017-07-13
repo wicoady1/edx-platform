@@ -184,6 +184,8 @@ class CapaFields(object):
                        scope=Scope.user_state, default={})
     input_state = Dict(help=_("Dictionary for maintaining the state of inputtypes"), scope=Scope.user_state)
     student_answers = Dict(help=_("Dictionary with the current student responses"), scope=Scope.user_state)
+
+    # enforce_type is set to False here because this field is saved as a dict in the database.
     score = ScoreField(help=_("Dictionary with the current student score"), scope=Scope.user_state, enforce_type=False)
     has_saved_answers = Boolean(help=_("Whether or not the answers have been saved since last submit"),
                                 scope=Scope.user_state)

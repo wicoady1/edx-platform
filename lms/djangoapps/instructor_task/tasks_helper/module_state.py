@@ -251,7 +251,6 @@ def override_score_module_state(xmodule_instance_args, module_descriptor, studen
             student,
             module_descriptor,
             xmodule_instance_args,
-            grade_bucket_type='rescore',
             course=course
         )
 
@@ -269,7 +268,7 @@ def override_score_module_state(xmodule_instance_args, module_descriptor, studen
             msg = "Scores cannot be overridden for this problem type."
             raise UpdateProblemModuleStateError(msg)
 
-        weighted_override_score = int(task_input['score'])
+        weighted_override_score = float(task_input['score'])
         if not (0 <= weighted_override_score <= instance.max_score()):
             msg = "Score must be between 0 and the maximum points available for the problem."
             raise UpdateProblemModuleStateError(msg)
