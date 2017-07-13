@@ -195,6 +195,7 @@ def _update_instructor_task(instructor_task, task_result):
         if entry_needs_saving:
             instructor_task.save()
 
+
 def _update_instructor_task_state(instructor_task, task_state, message=None):
     """
      Update state and output of InstructorTask object.
@@ -205,12 +206,14 @@ def _update_instructor_task_state(instructor_task, task_state, message=None):
 
     instructor_task.save()
 
+
 def _handle_instructor_task_failure(instructor_task, error):
 
     _update_instructor_task_state(instructor_task, FAILURE, error.message)
     log.info("instructor task (%s) failed, result: %s", instructor_task.task_id, error.message)
 
     raise QueueConnectionError()
+
 
 def get_updated_instructor_task(task_id):
     """

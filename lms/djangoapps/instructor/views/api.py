@@ -130,7 +130,7 @@ from .tools import (
 log = logging.getLogger(__name__)
 
 
-SUCCESS_MESSAGE_TEMPLATE  = "The {} report is being created. " \
+SUCCESS_MESSAGE_TEMPLATE = "The {} report is being created. " \
                             "To view the status of the report, see Pending Tasks below."
 
 ALREADY_RUNNING_MESSAGE_TEMPLATE = "The {} report is being created. " \
@@ -1396,6 +1396,7 @@ def add_users_to_cohorts(request, course_id):
 
     return JsonResponse()
 
+
 @ensure_csrf_cookie
 @cache_control(no_cache=True, no_store=True, must_revalidate=True)
 @require_level('staff')
@@ -1480,6 +1481,7 @@ def get_exec_summary_report(request, course_id):
 
     return JsonResponse(response_payload)
 
+
 @transaction.non_atomic_requests
 @require_POST
 @ensure_csrf_cookie
@@ -1505,6 +1507,7 @@ def get_course_survey_results(request, course_id):
         return JsonResponseBadRequest()
 
     return JsonResponse(response_payload)
+
 
 @transaction.non_atomic_requests
 @require_POST
@@ -1542,6 +1545,7 @@ def get_proctored_exam_results(request, course_id):
         return JsonResponseBadRequest()
 
     return JsonResponse(response_payload)
+
 
 def save_registration_code(user, course_id, mode_slug, invoice=None, order=None, invoice_item=None):
     """
