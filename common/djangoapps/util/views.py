@@ -299,9 +299,9 @@ def _record_feedback_in_zendesk(
     zendesk_tags = list(tags.values()) + ["LMS"]
 
     # Per edX support, we would like to be able to route feedback items by site via tagging
-    current_site_name = configuration_helpers.get_value("SITE_NAME")
+    current_site_name = configuration_helpers.get_value("SITE_NAME").replace(".","_")
     if current_site_name:
-        zendesk_tags.append("whitelabel_{org}".format(org=current_site_name))
+        zendesk_tags.append("site_name_{site}".format(site=current_site_name))
 
     new_ticket = {
         "ticket": {
