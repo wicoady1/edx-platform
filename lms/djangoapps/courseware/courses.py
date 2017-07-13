@@ -109,27 +109,6 @@ def get_course_overview_with_access(user, action, course_key, check_if_enrolled=
     return course_overview
 
 
-def _check_start_date_access_error(course, access_response):
-    """
-    Checks the response from has_access for a StartDateError.
-
-    Has a side effect of redirecting to the dashboard in the case of a
-    StartDateError.
-
-    Arguments:
-        course (CourseDescriptor|CourseOverview): The course being checked.
-        access_response (): The response from a previous call to has_access.
-    """
-    if isinstance(access_response, StartDateError):
-        start_date = strftime_localized(course.start, 'SHORT_DATE')
-        params = QueryDict(mutable=True)
-        params['notlive'] = start_date
-        raise CourseAccessRedirect('{dashboard_url}?{params}'.format(
-            dashboard_url=reverse('dashboard'),
-            params=params.urlencode()
-        ))
-
-
 def check_course_access(course, user, action, check_if_enrolled=False):
     """
     Check that the user has the access to perform the specified action
@@ -143,11 +122,18 @@ def check_course_access(course, user, action, check_if_enrolled=False):
 
     access_response = has_access(user, action, course, course.id)
     if not access_response:
-        _check_start_date_access_error(course, access_response)
+        params = None
+        if isinstance(access_response, StartDateError):
+            start_date = strftime_localized(course.start, 'SHORT_DATE')
+            params = QueryDict(mutable=True)
+            params['notlive'] = start_date
 
-        # Deliberately return a non-specific error message to avoid
-        # leaking info about access control settings
-        raise CoursewareAccessException(access_response)
+        # If messaging is added for general access problems, make it vague to
+        # not leak info about access control settings.
+        raise CourseAccessRedirect('{dashboard_url}{params}'.format(
+            dashboard_url=reverse('dashboard'),
+            params=("?" + params.urlencode() if params else '')
+        ))
 
     if check_if_enrolled:
         # If the user is not enrolled, redirect them to the about page
