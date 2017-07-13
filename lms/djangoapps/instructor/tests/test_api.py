@@ -3118,7 +3118,7 @@ class TestInstructorAPILevelsDataDump(SharedModuleStoreTestCase, LoginEnrollment
         with patch('lms.djangoapps.instructor_task.api.submit_export_ora2_data') as mock_submit_ora2_task:
             mock_submit_ora2_task.side_effect = AlreadyRunningError()
             response = self.client.post(url, {})
-        already_running_status = "The {report_type} report report is being created." \
+        already_running_status = "The {report_type} report is being created." \
                                  " To view the status of the report, see Pending Tasks below." \
                                  " You will be able to download the report" \
                                  " when it is" \
