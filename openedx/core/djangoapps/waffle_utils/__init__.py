@@ -223,7 +223,9 @@ class WaffleFlagNamespace(WaffleNamespace):
                 if value is None:
                     value = flag_is_active(get_request(), namespaced_flag_name)
 
-            self._cached_flags[namespaced_flag_name] = value
+            # Don't cache the result if it might have been affected by the callback
+            if not check_before_waffle_callback:
+                self._cached_flags[namespaced_flag_name] = value
         return value
 
 
